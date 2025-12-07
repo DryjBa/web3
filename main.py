@@ -8,13 +8,8 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import uvicorn
-from dotenv import load_dotenv
-import requests
 
 from utils import draw_cross, create_histogram, validate_image
-
-# Загружаем переменные окружения
-load_dotenv()
 
 app = FastAPI(title="Image Cross Processor", version="1.0")
 
@@ -31,10 +26,6 @@ os.makedirs(GENERATED_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-# Конфигурация reCAPTCHA
-RECAPTCHA_SECRET_KEY = os.getenv("RECAPTCHA_SECRET_KEY", "your-secret-key-here")
-RECAPTCHA_SITE_KEY = os.getenv("RECAPTCHA_SITE_KEY", "your-site-key-here")
-
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     """Главная страница с формой загрузки"""
@@ -42,7 +33,6 @@ async def home(request: Request):
         "index.html", 
         {
             "request": request, 
-            "recaptcha_site_key": RECAPTCHA_SITE_KEY,
             "max_file_size": 5  # МБ
         }
     )
@@ -54,20 +44,15 @@ async def process_image(
     cross_type: str = Form(...),
     color_r: int = Form(..., ge=0, le=255),
     color_g: int = Form(..., ge=0, le=255),
-    color_b: int = Form(..., ge=0, le=255),
-    recaptcha_response: str = Form(...)
+    color_b: int = Form(..., ge=0, le=255)
 ):
     """Обработка загруженного изображения"""
     
-    # 1. Проверка reCAPTCHA
-    if not await verify_recaptcha(recaptcha_response):
-        raise HTTPException(status_code=400, detail="Не пройдена проверка reCAPTCHA")
-    
-    # 2. Валидация файла
+    # 1. Валидация файла
     if not image.content_type.startswith("image/"):
         raise HTTPException(status_code=400, detail="Файл должен быть изображением")
     
-    # 3. Генерация уникальных имен файлов
+    # 2. Генерация уникальных имен файлов
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     unique_id = str(uuid.uuid4())[:8]
     
@@ -87,27 +72,27 @@ async def process_image(
     hist_processed_path = os.path.join(GENERATED_DIR, hist_processed_filename)
     
     try:
-        # 4. Сохраняем загруженное изображение
+        # 3. Сохраняем загруженное изображение
         contents = await image.read()
         with open(original_path, "wb") as f:
             f.write(contents)
         
-        # 5. Валидируем и обрабатываем изображение
+        # 4. Валидируем и обрабатываем изображение
         img, error = validate_image(original_path)
         if error:
             os.remove(original_path)
             raise HTTPException(status_code=400, detail=error)
         
-        # 6. Рисуем крест
+        # 5. Рисуем крест
         color = (color_r, color_g, color_b)
         processed_img = draw_cross(img, cross_type, color)
         processed_img.save(processed_path, "JPEG")
         
-        # 7. Создаем гистограммы
+        # 6. Создаем гистограммы
         create_histogram(img, hist_original_path, "Исходное изображение")
         create_histogram(processed_img, hist_processed_path, "Изображение с крестом")
         
-        # 8. Подготавливаем данные для шаблона
+        # 7. Подготавливаем данные для шаблона
         result_data = {
             "request": request,
             "original_image": f"/static/uploads/{original_filename}",
@@ -128,27 +113,6 @@ async def process_image(
             if os.path.exists(path):
                 os.remove(path)
         raise HTTPException(status_code=500, detail=f"Ошибка обработки: {str(e)}")
-
-async def verify_recaptcha(recaptcha_response: str) -> bool:
-    """Проверка Google reCAPTCHA"""
-    if not RECAPTCHA_SECRET_KEY or RECAPTCHA_SECRET_KEY == "your-secret-key-here":
-        # В режиме разработки пропускаем проверку
-        return True
-    
-    try:
-        payload = {
-            "secret": RECAPTCHA_SECRET_KEY,
-            "response": recaptcha_response
-        }
-        response = requests.post(
-            "https://www.google.com/recaptcha/api/siteverify",
-            data=payload,
-            timeout=10
-        )
-        result = response.json()
-        return result.get("success", False)
-    except:
-        return False
 
 @app.get("/health")
 async def health_check():

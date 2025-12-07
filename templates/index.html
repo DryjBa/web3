@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Обработка изображений - Лабораторная работа №3</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+</head>
+<body>
+    <div class="container mt-5">
+        <header class="text-center mb-5">
+            <h1 class="display-4">Лабораторная работа №3</h1>
+            <p class="lead">Веб-приложение для обработки изображений</p>
+            <p class="text-muted">Вариант 10: Рисование креста и анализ цветов</p>
+        </header>
+
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h2 class="h4 mb-0">Загрузите изображение для обработки</h2>
+                    </div>
+                    <div class="card-body">
+                        <form action="/process" method="post" enctype="multipart/form-data" id="uploadForm">
+                            
+                            <!-- Поле для загрузки файла -->
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Выберите изображение</label>
+                                <input type="file" class="form-control" id="image" name="image" accept=".jpg,.jpeg,.png" required>
+                                <div class="form-text">
+                                    Максимальный размер: <span id="maxSizeDisplay">{{ max_file_size }}</span> МБ. Поддерживаются JPG и PNG.
+                                </div>
+                            </div>
+                            
+                            <!-- Тип креста -->
+                            <div class="mb-3">
+                                <label class="form-label">Тип креста</label>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cross_type" id="vertical" value="vertical" checked>
+                                    <label class="form-check-label" for="vertical">
+                                        Вертикальный крест (+)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="cross_type" id="horizontal" value="horizontal">
+                                    <label class="form-check-label" for="horizontal">
+                                        Горизонтальный крест (X)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <!-- Выбор цвета -->
+                            <div class="mb-3">
+                                <label class="form-label">Цвет креста</label>
+                                <div class="row g-3">
+                                    <div class="col-md-4">
+                                        <label for="color_r" class="form-label">Красный (R)</label>
+                                        <input type="range" class="form-range" id="color_r" name="color_r" min="0" max="255" value="255" oninput="updateColorPreview()">
+                                        <div class="d-flex justify-content-between">
+                                            <span>0</span>
+                                            <span id="r_value">255</span>
+                                            <span>255</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="color_g" class="form-label">Зеленый (G)</label>
+                                        <input type="range" class="form-range" id="color_g" name="color_g" min="0" max="255" value="0" oninput="updateColorPreview()">
+                                        <div class="d-flex justify-content-between">
+                                            <span>0</span>
+                                            <span id="g_value">0</span>
+                                            <span>255</span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label for="color_b" class="form-label">Синий (B)</label>
+                                        <input type="range" class="form-range" id="color_b" name="color_b" min="0" max="255" value="0" oninput="updateColorPreview()">
+                                        <div class="d-flex justify-content-between">
+                                            <span>0</span>
+                                            <span id="b_value">0</span>
+                                            <span>255</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Превью цвета -->
+                                <div class="mt-3">
+                                    <label class="form-label">Превью цвета:</label>
+                                    <div class="color-preview" id="colorPreview" 
+                                         style="width: 100%; height: 40px; border: 1px solid #ddd; border-radius: 4px;">
+                                    </div>
+                                    <div class="mt-1 text-center" id="colorText">RGB(255, 0, 0)</div>
+                                </div>
+                            </div>
+                            
+                            <!-- reCAPTCHA -->
+                            <div class="mb-3">
+                                <div class="g-recaptcha" data-sitekey="{{ recaptcha_site_key }}"></div>
+                            </div>
+                            
+                            <!-- Кнопка отправки -->
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-success btn-lg">
+                                    <i class="bi bi-magic"></i> Обработать изображение
+                                </button>
+                                <button type="reset" class="btn btn-outline-secondary">Сбросить</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="card-footer text-muted">
+                        <small>Изображения хранятся временно и автоматически удаляются</small>
+                    </div>
+                </div>
+                
+                <!-- Инструкция -->
+                <div class="card mt-4 shadow-sm">
+                    <div class="card-header bg-light">
+                        <h3 class="h5 mb-0">Инструкция</h3>
+                    </div>
+                    <div class="card-body">
+                        <ol>
+                            <li>Загрузите изображение в формате JPG или PNG</li>
+                            <li>Выберите тип креста: вертикальный (+) или горизонтальный (X)</li>
+                            <li>Настройте цвет креста с помощью ползунков</li>
+                            <li>Пройдите проверку reCAPTCHA</li>
+                            <li>Нажмите "Обработать изображение"</li>
+                            <li>На следующей странице вы увидите:
+                                <ul>
+                                    <li>Исходное изображение</li>
+                                    <li>Изображение с крестом</li>
+                                    <li>Гистограммы распределения цветов</li>
+                                </ul>
+                            </li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <footer class="mt-5 pt-4 border-top text-center">
+            <p class="text-muted">Лабораторная работа по веб-разработке. CI/CD с GitHub Actions и деплой на Render.</p>
+            <p><a href="/health" class="text-decoration-none">Проверить статус приложения</a></p>
+        </footer>
+    </div>
+
+    <script>
+        // Обновление превью цвета
+        function updateColorPreview() {
+            const r = document.getElementById('color_r').value;
+            const g = document.getElementById('color_g').value;
+            const b = document.getElementById('color_b').value;
+            
+            document.getElementById('r_value').textContent = r;
+            document.getElementById('g_value').textContent = g;
+            document.getElementById('b_value').textContent = b;
+            
+            const preview = document.getElementById('colorPreview');
+            preview.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+            document.getElementById('colorText').textContent = `RGB(${r}, ${g}, ${b})`;
+        }
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            updateColorPreview();
+            
+            // Получаем максимальный размер файла из data-атрибута
+            const maxSizeDisplay = document.getElementById('maxSizeDisplay');
+            const maxFileSize = maxSizeDisplay ? parseInt(maxSizeDisplay.textContent) : 5; // По умолчанию 5 МБ
+            
+            // Проверка размера файла перед отправкой
+            document.getElementById('uploadForm').addEventListener('submit', function(e) {
+                const fileInput = document.getElementById('image');
+                const maxSize = maxFileSize * 1024 * 1024; // Конвертируем в байты
+                
+                if (fileInput.files.length > 0) {
+                    const fileSize = fileInput.files[0].size;
+                    if (fileSize > maxSize) {
+                        e.preventDefault();
+                        alert(`Файл слишком большой. Максимальный размер: ${maxFileSize} МБ`);
+                    }
+                }
+            });
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Pipenv
+Pipfile.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Статические файлы
+static/uploads/
+static/generated/
+
+# Окружение
+.env
+.env.local
+
+# Логи
+*.log
+
+# Операционная система
+.DS_Store
+Thumbs.db
